@@ -28,6 +28,9 @@
   <img src="https://img.shields.io/badge/C-A8B9CC?style=flat-square&logo=C&logoColor=white" />
   <img src="https://img.shields.io/badge/Python-3776AB?style=flat-square&logo=Python&logoColor=white" />
   <img src="https://img.shields.io/badge/iOS-000000?style=flat-square&logo=iOS&logoColor=white" />
+  <a href="https://www.youtube.com/@%EB%B3%91%EB%B3%91%EB%B3%91%ED%8C%AC%EA%B3%84%EC%A0%95" target="_blank">
+    <img src="https://img.shields.io/badge/YouTube-FF0000?style=flat-square&logo=YouTube&logoColor=white" />
+  </a>
 </p>
 
 ---
