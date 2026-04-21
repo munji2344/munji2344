@@ -35,6 +35,14 @@
 
 ---
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/munji2344/munji2344/main/[사진파일명.확장자]" alt="My Cute Cat" width="300px" style="border-radius: 50%;" />
+  <br>
+  <em>제 소중한 털뭉치 룸메이트입니다! 🐾</em>
+</p>
+
+---
+
 ### 📊 GitHub Stats
 <p align="center">
   <img src="https://github-readme-stats.vercel.app/api?username=munji2344&show_icons=true&theme=tokyonight" alt="Stats" />
