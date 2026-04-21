@@ -1,9 +1,7 @@
 
-## Hanshin University AISW Convergence
-### 26학번 김태환
+# Hanshin University AISW Convergence
 
-
-# 👋 안녕하세요, [이름/닉네임]입니다!
+# 👋 <26학번 김태환>
 
 <p align="center">
   <img src="https://capsule-render.vercel.app/api?type=waving&color=auto&height=200&section=header&text=Welcome%20to%20my%20GitHub&fontSize=50" />
