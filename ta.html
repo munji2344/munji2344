@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>에브리타임 스타일 시간표</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; background-color: #f8f8f8; padding: 20px; margin: 0; }
+        
+        /* 제목과 총 학점 뱃지 정렬 */
+        .header-container { display: flex; align-items: center; gap: 15px; margin-bottom: 15px; }
+        h2 { color: #c62917; margin: 0; }
+        .credit-badge { background-color: #c62917; color: white; padding: 5px 12px; border-radius: 20px; font-size: 14px; font-weight: bold; box-shadow: 0 2px 4px rgba(198, 41, 23, 0.2); transition: all 0.2s; }
+        
+        .upload-section { margin-bottom: 20px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .app-container { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
+        .timetable-container { flex: 1; min-width: 600px; background-color: white; border: 1px solid #e3e3e3; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        
+        /* 월~금 (5개 요일) 기준 그리드 */
+        .table-header { display: grid; grid-template-columns: 40px repeat(5, 1fr); background-color: #f9f9f9; border-bottom: 1px solid #e3e3e3; }
+        .day { text-align: center; padding: 10px 0; font-size: 13px; font-weight: bold; color: #737373; border-left: 1px solid #e3e3e3; }
+        .day:first-child { border-left: none; }
+        .table-body { display: grid; grid-template-columns: 40px repeat(5, 1fr); position: relative; }
+        .time-col { border-right: 1px solid #e3e3e3; }
+        .time-slot { height: 50px; box-sizing: border-box; border-bottom: 1px solid #f2f2f2; text-align: right; padding-right: 5px; font-size: 11px; color: #a6a6a6; display: flex; align-items: flex-end; justify-content: flex-end; padding-bottom: 5px; }
+        .grid-col { position: relative; border-right: 1px solid #f2f2f2; background-image: linear-gradient(transparent 49px, #f2f2f2 49px, #f2f2f2 50px); background-size: 100% 50px; }
+        .grid-col:last-child { border-right: none; }
+        
+        .class-block { position: absolute; left: 2px; right: 2px; border-radius: 4px; padding: 6px; box-sizing: border-box; color: #333333; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); line-height: 1.2; z-index: 10; }
+        .subject-name { font-size: 13px; font-weight: bold; margin-bottom: 4px; line-height: 1.3; }
+        .prof-name { font-size: 11px; opacity: 0.9; }
+        .remark-text { font-size: 10px; opacity: 0.7; margin-top: 3px; display: block; word-break: keep-all; }
+        
+        .subject-list-container { width: 350px; height: 700px; background-color: white; border: 1px solid #e3e3e3; border-radius: 8px; display: flex; flex-direction: column; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .list-header { padding: 15px; background-color: #f9f9f9; border-bottom: 1px solid #e3e3e3; font-weight: bold; font-size: 15px; color: #333; border-radius: 8px 8px 0 0; }
+        
+        .filter-section { padding: 10px 15px; border-bottom: 1px solid #e3e3e3; background-color: #ffffff; display: flex; flex-direction: column; gap: 8px; }
+        .search-input { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; box-sizing: border-box; }
+        .filter-row { display: flex; gap: 6px; }
+        .filter-select { flex: 1; padding: 6px 4px; border: 1px solid #ccc; border-radius: 4px; font-size: 11px; color: #333; text-overflow: ellipsis; }
+        
+        .subject-list { flex: 1; overflow-y: auto; padding: 0; margin: 0; list-style: none; }
+        
+        .list-group-header {
+            background-color: #eeeeee; color: #555; font-size: 12px; font-weight: bold;
+            padding: 8px 15px; border-bottom: 1px solid #e3e3e3; position: sticky; top: 0; z-index: 5;
+        }
+
+        .subject-item { padding: 15px; border-bottom: 1px solid #f2f2f2; cursor: pointer; transition: background-color 0.2s; }
+        .subject-item:hover { background-color: #f5f5f5; }
+        .subject-item.added { background-color: #fff4f4; border-left: 4px solid #c62917; }
+        .item-title { font-size: 14px; font-weight: bold; color: #333; margin-bottom: 5px; }
+        .item-info { font-size: 12px; color: #777; margin-bottom: 3px; }
+        .item-remark { font-size: 11px; color: #c62917; opacity: 0.85; margin-top: 6px; background: #fff0f0; padding: 4px 6px; border-radius: 4px; display: inline-block; word-break: keep-all;}
+        
+        .empty-msg { padding: 20px; text-align: center; color: #999; font-size: 13px; list-style: none; }
+    </style>
+</head>
+<body>
+
+    <div class="header-container">
+        <h2>📅 내 시간표 만들기</h2>
+        <div class="credit-badge" id="totalCreditsBadge">총 0학점</div>
+    </div>
+    
+    <div class="upload-section">
+        <label for="excelFile"><strong>엑셀 파일 업로드:</strong></label>
+        <input type="file" id="excelFile" accept=".xlsx, .xls" />
+        <span style="font-size: 13px; color: #666; margin-left: 10px;">* 파일을 업로드한 후, 우측 목록에서 과목을 클릭하여 시간표에 추가하세요!</span>
+    </div>
+
+    <div class="app-container">
+        <!-- 왼쪽: 시간표 (월~금) -->
+        <div class="timetable-container">
+            <div class="table-header">
+                <div class="day"></div>
+                <div class="day">월</div>
+                <div class="day">화</div>
+                <div class="day">수</div>
+                <div class="day">목</div>
+                <div class="day">금</div>
+            </div>
+            <div class="table-body" id="tableBody">
+                <div class="time-col" id="timeAxis"></div>
+                <div class="grid-col" id="col-mon"></div>
+                <div class="grid-col" id="col-tue"></div>
+                <div class="grid-col" id="col-wed"></div>
+                <div class="grid-col" id="col-thu"></div>
+                <div class="grid-col" id="col-fri"></div>
+            </div>
+        </div>
+
+        <!-- 오른쪽: 강의 목록 -->
+        <div class="subject-list-container">
+            <div class="list-header">📚 개설 강의 목록</div>
+            
+            <div class="filter-section">
+                <input type="text" id="searchInput" class="search-input" placeholder="과목명 또는 교수명 검색">
+                <div class="filter-row">
+                    <select id="gradeFilter" class="filter-select">
+                        <option value="">전체 학년</option>
+                    </select>
+                    <select id="courseTypeFilter" class="filter-select">
+                        <option value="">전체 이수구분</option>
+                    </select>
+                    <!-- 📌 학점 필터 추가 -->
+                    <select id="creditFilter" class="filter-select">
+                        <option value="">전체 학점</option>
+                    </select>
+                </div>
+            </div>
+
+            <ul class="subject-list" id="subjectList">
+                <li class="empty-msg">엑셀 파일을 업로드하면<br />여기에 강의 목록이 나타납니다.</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        /* global window, document, FileReader, Uint8Array */
+
+        const colors = ['#FAD4D4', '#FCE2C4', '#F4F1DE', '#D9E8E3', '#C4D6D3', '#D0D9E8', '#E3D8E8', '#F5D3D6', '#FFF2CC'];
+        const START_HOUR = 8; 
+        const END_HOUR = 22;
+        const PIXELS_PER_HOUR = 50; 
+
+        const dayMap = { '월': 'mon', '화': 'tue', '수': 'wed', '목': 'thu', '금': 'fri' };
+
+        let allSubjects = []; 
+        let addedSubjectIds = new Set(); 
+
+        const timeAxis = document.getElementById('timeAxis');
+        for (let i = START_HOUR; i < END_HOUR; i++) {
+            const slot = document.createElement('div');
+            slot.className = 'time-slot';
+            slot.innerText = i;
+            timeAxis.appendChild(slot);
+        }
+
+        const excelFileInput = document.getElementById('excelFile');
+        const searchInput = document.getElementById('searchInput');
+        const gradeFilter = document.getElementById('gradeFilter');
+        const courseTypeFilter = document.getElementById('courseTypeFilter');
+        const creditFilter = document.getElementById('creditFilter');
+        const totalCreditsBadge = document.getElementById('totalCreditsBadge');
+
+        searchInput.addEventListener('input', renderList);
+        gradeFilter.addEventListener('change', renderList);
+        courseTypeFilter.addEventListener('change', renderList);
+        creditFilter.addEventListener('change', renderList);
+
+        excelFileInput.addEventListener('click', function(e) { e.target.value = ''; });
+        excelFileInput.addEventListener('change', handleFile, false);
+
+        function handleFile(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const data = new Uint8Array(event.target.result);
+                const workbook = window.XLSX.read(data, {type: 'array'});
+                const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                const jsonData = window.XLSX.utils.sheet_to_json(worksheet, {header: 1, defval: ""});
+                
+                allSubjects = [];
+                addedSubjectIds.clear();
+
+                const uniqueGrades = new Set();
+                const uniqueCourseTypes = new Set();
+                const uniqueCredits = new Set();
+
+                for (let i = 0; i < jsonData.length; i++) {
+                    const row = jsonData[i];
+                    if (!row || row.length < 10) continue;
+
+                    const grade = row[0] ? String(row[0]).trim() : "기타";
+                    const courseType = row[2] ? String(row[2]).trim() : "분류없음";
+                    const subject = row[9] ? String(row[9]).trim() : "";
+                    const credit = row[10] ? parseFloat(row[10]) || 0 : 0;
+                    const prof = row[11] ? String(row[11]).trim() : "";
+                    const timeInfo = row[14] ? String(row[14]).trim() : "";
+                    const remark = row[16] ? String(row[16]).trim() : "";
+
+                    if (!subject || subject.includes('교과목명') || subject === '교과목명') continue;
+                    if (!timeInfo) continue; 
+
+                    // 토요일(온라인 수업) 제외
+                    if (timeInfo.includes('토')) continue;
+
+                    allSubjects.push({ 
+                        id: i, grade: grade, courseType: courseType, 
+                        subject: subject, credit: credit, prof: prof, timeInfo: timeInfo, remark: remark 
+                    });
+
+                    uniqueGrades.add(grade);
+                    uniqueCourseTypes.add(courseType);
+                    uniqueCredits.add(credit);
+                }
+
+                allSubjects.sort((a, b) => {
+                    if (a.grade !== b.grade) return a.grade.localeCompare(b.grade, 'ko', {numeric: true});
+                    if (a.courseType !== b.courseType) return a.courseType.localeCompare(b.courseType, 'ko');
+                    return a.subject.localeCompare(b.subject, 'ko');
+                });
+
+                updateFilterOptions(uniqueGrades, uniqueCourseTypes, uniqueCredits);
+                searchInput.value = '';
+
+                renderList(); 
+                renderTimetable(); 
+                updateTotalCredits();
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function updateFilterOptions(grades, courseTypes, credits) {
+            gradeFilter.innerHTML = '<option value="">전체 학년</option>';
+            courseTypeFilter.innerHTML = '<option value="">전체 이수구분</option>';
+            creditFilter.innerHTML = '<option value="">전체 학점</option>';
+
+            // 학년 옵션
+            Array.from(grades).sort((a,b) => a.localeCompare(b, 'ko', {numeric: true})).forEach(grade => {
+                const option = document.createElement('option');
+                option.value = grade;
+                option.innerText = isNaN(grade) ? grade : `${grade}학년`;
+                gradeFilter.appendChild(option);
+            });
+
+            // 이수구분 옵션
+            Array.from(courseTypes).sort().forEach(type => {
+                const option = document.createElement('option');
+                option.value = type;
+                option.innerText = type;
+                courseTypeFilter.appendChild(option);
+            });
+
+            // 📌 학점 옵션 추가 (오름차순 정렬)
+            Array.from(credits).sort((a, b) => a - b).forEach(credit => {
+                const option = document.createElement('option');
+                option.value = credit;
+                option.innerText = `${credit}학점`;
+                creditFilter.appendChild(option);
+            });
+        }
+
+        function renderList() {
+            const listEl = document.getElementById('subjectList');
+            listEl.innerHTML = ''; 
+
+            if (allSubjects.length === 0) {
+                listEl.innerHTML = '<li class="empty-msg">읽어올 수 있는 강의 데이터가 없습니다.</li>';
+                return;
+            }
+
+            const keyword = searchInput.value.trim().toLowerCase();
+            const selectedGrade = gradeFilter.value;
+            const selectedType = courseTypeFilter.value;
+            const selectedCredit = creditFilter.value;
+
+            // 📌 학점 필터 조건 적용
+            const filteredSubjects = allSubjects.filter(item => {
+                const matchKeyword = (item.subject.toLowerCase().includes(keyword) || item.prof.toLowerCase().includes(keyword));
+                const matchGrade = (selectedGrade === "" || item.grade === selectedGrade);
+                const matchType = (selectedType === "" || item.courseType === selectedType);
+                const matchCredit = (selectedCredit === "" || item.credit.toString() === selectedCredit);
+                return matchKeyword && matchGrade && matchType && matchCredit;
+            });
+
+            if (filteredSubjects.length === 0) {
+                listEl.innerHTML = '<li class="empty-msg">검색 결과가 없습니다.</li>';
+                return;
+            }
+
+            let currentGroup = "";
+
+            filteredSubjects.forEach(item => {
+                const gradeText = isNaN(item.grade) ? item.grade : `${item.grade}학년`;
+                const groupName = `${gradeText} - ${item.courseType}`;
+
+                if (currentGroup !== groupName) {
+                    currentGroup = groupName;
+                    const headerLi = document.createElement('li');
+                    headerLi.className = 'list-group-header';
+                    headerLi.innerText = currentGroup;
+                    listEl.appendChild(headerLi);
+                }
+
+                const li = document.createElement('li');
+                li.className = 'subject-item';
+                if (addedSubjectIds.has(item.id)) li.classList.add('added');
+
+                let remarkHtml = '';
+                if (item.remark) {
+                    remarkHtml = `<div class="item-remark">📝 ${item.remark}</div>`;
+                }
+
+                li.innerHTML = `
+                    <div class="item-title">${item.subject} (${item.credit}학점)</div>
+                    <div class="item-info">🧑‍🏫 ${item.prof || '미지정'}</div>
+                    <div class="item-info">⏰ ${item.timeInfo}</div>
+                    ${remarkHtml}
+                `;
+
+                li.addEventListener('click', () => { toggleSubject(item.id, li); });
+                listEl.appendChild(li);
+            });
+        }
+
+        function toggleSubject(id, liElement) {
+            if (addedSubjectIds.has(id)) {
+                addedSubjectIds.delete(id);
+                liElement.classList.remove('added');
+            } else {
+                addedSubjectIds.add(id);
+                liElement.classList.add('added');
+            }
+            renderTimetable();
+            updateTotalCredits();
+        }
+
+        function updateTotalCredits() {
+            let total = 0;
+            addedSubjectIds.forEach(id => {
+                const item = allSubjects.find(s => s.id === id);
+                if (item) total += item.credit;
+            });
+            
+            totalCreditsBadge.innerText = `총 ${total}학점`;
+            
+            totalCreditsBadge.style.transform = 'scale(1.1)';
+            setTimeout(() => {
+                totalCreditsBadge.style.transform = 'scale(1)';
+            }, 150);
+        }
+
+        function renderTimetable() {
+            ['mon', 'tue', 'wed', 'thu', 'fri'].forEach(dayEng => {
+                const col = document.getElementById('col-' + dayEng);
+                if (col) col.innerHTML = '';
+            });
+
+            let colorIndex = 0;
+            
+            addedSubjectIds.forEach(id => {
+                const item = allSubjects.find(s => s.id === id);
+                if (!item) return;
+
+                const bgColor = colors[colorIndex % colors.length];
+                colorIndex++;
+
+                const regex = /([월화수목금토일])(?:요일)?\s*\(\s*(\d{1,2})\s*:\s*(\d{2})\s*[~-]\s*(\d{1,2})\s*:\s*(\d{2})\s*\)/g;
+                let match;
+                
+                while ((match = regex.exec(item.timeInfo)) !== null) {
+                    const dayKor = match[1];
+                    const startHour = parseInt(match[2], 10);
+                    const startMin = parseInt(match[3], 10);
+                    const endHour = parseInt(match[4], 10);
+                    const endMin = parseInt(match[5], 10);
+                    
+                    const startTimeInHours = startHour + (startMin / 60);
+                    const endTimeInHours = endHour + (endMin / 60);
+                    const durationHours = endTimeInHours - startTimeInHours;
+
+                    const dayEng = dayMap[dayKor]; 
+                    if (dayEng) {
+                        const subjectWithCredit = `${item.subject} (${item.credit}학점)`;
+                        createBlock(dayEng, subjectWithCredit, item.prof, item.remark, startTimeInHours, durationHours, bgColor);
+                    }
+                }
+            });
+        }
+
+        function createBlock(dayEng, subject, prof, remark, startTime, durationHours, bgColor) {
+            const col = document.getElementById('col-' + dayEng);
+            if (!col) return;
+
+            const block = document.createElement('div');
+            block.className = 'class-block';
+            block.style.backgroundColor = bgColor;
+            
+            const topPos = (startTime - START_HOUR) * PIXELS_PER_HOUR;
+            const height = durationHours * PIXELS_PER_HOUR;
+
+            block.style.top = topPos + 'px';
+            block.style.height = height + 'px';
+
+            let htmlContent = `<div class="subject-name">${subject}</div>`;
+            if (prof) htmlContent += `<div class="prof-name">${prof}</div>`;
+            if (remark) htmlContent += `<div class="remark-text">(${remark})</div>`;
+
+            block.innerHTML = htmlContent;
+            col.appendChild(block);
+        }
+    </script>
+</body>
+</html>
